@@ -32,7 +32,7 @@ def get_secrets() -> Dict[str, str]:
 def lambda_handler(event, context):
     # event comes in as a dictionary
     print(event)
-    repos_for_processing = event["body"]["repos_responsible_for"]
+    repos_for_processing = event["repos_responsible_for"]
     if len(repos_for_processing) == 0:
         return f"repos_for_processing is empty!"
     else:

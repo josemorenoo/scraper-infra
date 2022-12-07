@@ -52,18 +52,17 @@ def master_lambda_handler(event, context):
     orch = Orchestrator(start_date=start_date, end_date=end_date, sts_secrets=secrets)
     repo_url_groups: List[List[str]] = orch.group_repos()
     print(f"repo_url_groups: {len(repo_url_groups)}")
-    print(*repo_url_groups, sep="\n")
 
     for i, repo_group in enumerate(repo_url_groups):
-        print(f"sending {len(repo_group)} repos to worker {i}")
+        print(f"\nsending {len(repo_group)} repos to worker {i}")
         params = {"repos_responsible_for": repo_group}
 
-        response = client.invoke(
+        client.invoke(
             FunctionName="arn:aws:lambda:us-west-1:665809458133:function:repo-scraper",
             InvocationType="Event",
             Payload=json.dumps(params),
         )
 
-        print(i, response)
+        print(i)
 
     print("done orchestrating")
