@@ -2,7 +2,9 @@ from batch_scraper.run import Runner
 
 import boto3
 from botocore.exceptions import ClientError
+from datetime import datetime
 import json
+import os
 from typing import Dict
 
 
@@ -28,24 +30,26 @@ def get_secrets() -> Dict[str, str]:
 
 
 def lambda_handler(event, context):
+    repos_for_processing = json.loads(event["body"]).get("repos_responsible_for")
+    if len(repos_for_processing) == 0:
+        return f"repos_for_processing is empty!"
+    else:
+        print(f"repos_for_processing contains {len(repos_for_processing)} items")
+
     secrets: Dict[str, str] = get_secrets()
 
     runner = Runner(
-        job_hash="xxxxx",
+        job_hash=datetime.today().strftime("%Y-%m-%d"),
         worker_id=context.aws_request_id,
-        tokens_responsible_for=["ETH", "BTC"],
+        repos_responsible_for=repos_for_processing,
         sts_secrets=secrets,
     )
     s3_generated_report_path = runner.run()
+
+    # cleanup
+    os.system("rm -rf /tmp/*")
+
     s3_path = f"s3://coincommit/{s3_generated_report_path}"
     print(f"output: {s3_path}")
-    """
-        scraper = ScrapeCMC(secrets)
-        description = scraper.scrape_project_description("ethereum")
-        if description:
-            print(description)
-        else:
-            print("got back no description, huh")
-    """
 
     return s3_path
