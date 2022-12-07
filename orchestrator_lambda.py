@@ -34,16 +34,22 @@ def get_secrets() -> Dict[str, str]:
 def master_lambda_handler(event, context):
     if "start_date" in event and "end_date" in event:
         # pass in start and end to orchestrator for backfilling
-        start_date = event["start_date"].strftime("%Y-%m-%d")
-        end_date = event["start_date"].strftime("%Y-%m-%d")
+        start_date = datetime.strptime(event["start_date"], "%Y-%m-%d")
+        end_date = datetime.strptime(event["start_date"], "%Y-%m-%d")
     else:
         # just use today's date
         end_date = datetime.now()
         start_date = end_date - timedelta(1)
 
+    print(
+        f'orchestrating for {start_date.strftime("%Y-%m-%d")} thru {end_date.strftime("%Y-%m-%d")}'
+    )
+
     secrets: Dict[str, str] = get_secrets()
     orch = Orchestrator(start_date=start_date, end_date=end_date, sts_secrets=secrets)
     repo_url_groups: List[List[str]] = orch.group_repos()
+    print(f"repo_url_groups: {len(repo_url_groups)}")
+    print(*repo_url_groups, sep="\n")
 
     for i, repo_group in enumerate(repo_url_groups):
         print(f"sending {len(repo_group)} repos to worker {i}")
