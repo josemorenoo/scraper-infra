@@ -35,15 +35,18 @@ def master_lambda_handler(event, context):
     if "start_date" in event and "end_date" in event:
         # pass in start and end to orchestrator for backfilling
         start_date = datetime.strptime(event["start_date"], "%Y-%m-%d")
-        end_date = datetime.strptime(event["start_date"], "%Y-%m-%d")
+        end_date = datetime.strptime(event["end_date"], "%Y-%m-%d")
+        print(
+            f'Dates Passed In: orchestrating for {start_date.strftime("%Y-%m-%d")} thru {end_date.strftime("%Y-%m-%d")}'
+        )
     else:
         # just use today's date
         end_date = datetime.now()
         start_date = end_date - timedelta(1)
 
-    print(
-        f'orchestrating for {start_date.strftime("%Y-%m-%d")} thru {end_date.strftime("%Y-%m-%d")}'
-    )
+        print(
+            f'Today"s date inferred: orchestrating for {start_date.strftime("%Y-%m-%d")} thru {end_date.strftime("%Y-%m-%d")}'
+        )
 
     secrets: Dict[str, str] = get_secrets()
     orch = Orchestrator(start_date=start_date, end_date=end_date, sts_secrets=secrets)
