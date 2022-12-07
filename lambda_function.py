@@ -30,11 +30,15 @@ def get_secrets() -> Dict[str, str]:
 
 
 def lambda_handler(event, context):
-    repos_for_processing = json.loads(event["body"]).get("repos_responsible_for")
+    # event comes in as a dictionary
+    print(event)
+    repos_for_processing = event["body"]["repos_responsible_for"]
     if len(repos_for_processing) == 0:
         return f"repos_for_processing is empty!"
     else:
-        print(f"repos_for_processing contains {len(repos_for_processing)} items")
+        print(
+            f"repos_for_processing contains {len(repos_for_processing)} items: {repos_for_processing}"
+        )
 
     secrets: Dict[str, str] = get_secrets()
 
@@ -52,4 +56,10 @@ def lambda_handler(event, context):
     s3_path = f"s3://coincommit/{s3_generated_report_path}"
     print(f"output: {s3_path}")
 
-    return s3_path
+    lambda_response = {
+        "report_path": s3_path,
+        "invocation_id": context.aws_request_id,
+        "responsible_for": ",".join(repos_for_processing),
+    }
+
+    return lambda_response
