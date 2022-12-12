@@ -23,7 +23,7 @@ with open(f"{package_name}batch_scraper/requirements.txt", "r") as req_file:
 # create deployment package
 if os.path.exists("batch-scraper-deployment.zip"):
     os.remove("batch-scraper-deployment.zip")
-os.system("zip batch-scraper-deployment.zip lambda_function.py")
+os.system("zip batch-scraper-deployment.zip worker_lambda.py")
 os.system(f"cd {package_name} && zip -r ../../../../batch-scraper-deployment.zip *")
 
 # cleanup
