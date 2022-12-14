@@ -2,10 +2,10 @@ from batch_scraper.run import Runner
 
 import boto3
 from botocore.exceptions import ClientError
-from datetime import datetime, timedelta
 import json
 import os
 from typing import Dict
+import time
 
 
 def get_secrets() -> Dict[str, str]:
@@ -34,6 +34,7 @@ def lambda_handler(event, context):
     repos_for_processing = event["repos_responsible_for"]
     start_date: str = event["start_date"]
     end_date: str = event["end_date"]
+    worker_id: str = str(event["worker_id"])
 
     if len(repos_for_processing) == 0:
         return f"repos_for_processing is empty!"
@@ -44,11 +45,12 @@ def lambda_handler(event, context):
 
     secrets: Dict[str, str] = get_secrets()
 
+    start = time.time()
     runner = Runner(
         start_date=start_date,
         end_date=end_date,
         job_hash=end_date,
-        worker_id=context.aws_request_id,
+        worker_id=context.aws_request_id[0:6] + "_id_" + worker_id,
         repos_responsible_for=repos_for_processing,
         sts_secrets=secrets,
     )
@@ -59,11 +61,13 @@ def lambda_handler(event, context):
 
     s3_path = f"s3://coincommit/{s3_generated_report_path}"
     print(f"output: {s3_path}")
+    end = time.time()
 
     lambda_response = {
         "report_path": s3_path,
         "invocation_id": context.aws_request_id,
-        "responsible_for": ",".join(repos_for_processing),
+        "worker_duration_secs": end - start,
+        "worker_id": worker_id,
     }
 
     return lambda_response
