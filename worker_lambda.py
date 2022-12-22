@@ -9,7 +9,7 @@ import time
 
 
 def get_secrets() -> Dict[str, str]:
-    secret_name = "reposcraper-keys"
+    secret_name = "coincommitsecrets"
     region_name = "us-west-1"
 
     # Create a Secrets Manager client

@@ -3,6 +3,7 @@ import boto3
 from datetime import datetime, timedelta
 from typing import Dict, List
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 from collections import defaultdict
 import os
 import shutil
@@ -18,13 +19,14 @@ boto_config = Config(
     read_timeout=900,
     connect_timeout=900,
     region_name="us-west-1",
+    max_pool_connections=50,
 )
 lambda_client = boto3.client("lambda", config=boto_config)
 s3_client = boto3.resource("s3")
 
 
 def get_secrets() -> Dict[str, str]:
-    secret_name = "reposcraper-keys"
+    secret_name = "coincommitsecrets"
     region_name = "us-west-1"
 
     # Create a Secrets Manager client
@@ -172,6 +174,17 @@ def join_reports(results: str, report_date: str):
     print("durations: ", durations)
 
 
+def dump_empty_report(report_date):
+    master_report = {}
+    master_report_local_path = f"/tmp/{report_date}.json"
+    with open(master_report_local_path, "w") as fp:
+        json.dump(master_report, fp, indent=2)
+        print(f"dumped EMPTY report to {master_report_local_path}")
+
+    object_name = f"reports/{report_date}/{report_date}.json"
+    s3_client.Bucket("coincommit").upload_file(master_report_local_path, object_name)
+
+
 def master_lambda_handler(event, context):
     start = time.time()
     if "start_date" in event and "end_date" in event:
@@ -201,7 +214,7 @@ def master_lambda_handler(event, context):
         zip(repo_url_groups, repo_group_sizes)
     ):
         print(
-            f"\nsending {len(repo_group)} repos to worker {i}, {round(group_size,2)}mb"
+            f"\nsending {len(repo_group)} repos to worker {i}, max potential size: {round(group_size,2)}mb"
         )
 
     def invoke_worker(repo_group, worker_id):
@@ -219,12 +232,27 @@ def master_lambda_handler(event, context):
         return response["Payload"].read()
 
     results = []
+    if len(repo_url_groups) == 0:
+        print(f"Devs are sleeping, no commits anywhere between {start_date} {end_date}")
+    else:
+        with ThreadPoolExecutor(max_workers=len(repo_url_groups)) as executor:
+            futures = [
+                executor.submit(invoke_worker, repo_group, i)
+                for i, repo_group in enumerate(repo_url_groups)
+            ]
+            for future in as_completed(futures):
+                worker_result = future.result()
+                results.append(worker_result)
+                print(worker_result)
+
+    """
     with ThreadPoolExecutor(max_workers=len(repo_url_groups)) as executor:
         for response in executor.map(
             invoke_worker, repo_url_groups, range(len(repo_url_groups))
         ):
             results.append(response)
     print(*results, sep="\n")
+    """
 
     # only join valid results
     valid_results = [
@@ -237,7 +265,11 @@ def master_lambda_handler(event, context):
     print(f"{len(results)} workers, valid results {len(valid_results)}")
 
     # join worker reports
-    join_reports(valid_results, report_date=event["end_date"])
+    if len(valid_results) > 0:
+        join_reports(valid_results, report_date=event["end_date"])
+    else:
+        dump_empty_report(report_date=event["end_date"])
+
     end = time.time()
     lambda_results = {
         "results_count": len(results),
