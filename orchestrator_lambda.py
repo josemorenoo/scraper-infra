@@ -187,6 +187,9 @@ def dump_empty_report(report_date):
 
 def master_lambda_handler(event, context):
     start = time.time()
+    for k, v in event.items():
+        print(k, v)
+    return 1
     if "start_date" in event and "end_date" in event:
         # pass in start and end to orchestrator for backfilling
         start_date = datetime.strptime(event["start_date"], "%Y-%m-%d")
@@ -203,8 +206,18 @@ def master_lambda_handler(event, context):
             f'Today"s date inferred: orchestrating for {start_date.strftime("%Y-%m-%d")} thru {end_date.strftime("%Y-%m-%d")}'
         )
 
+    if "backfilling" in event:
+        backfilling = bool(event["backfilling"])
+    else:
+        backfilling = False
+
     secrets: Dict[str, str] = get_secrets()
-    orch = Orchestrator(start_date=start_date, end_date=end_date, sts_secrets=secrets)
+    orch = Orchestrator(
+        start_date=start_date,
+        end_date=end_date,
+        sts_secrets=secrets,
+        backfilling=backfilling,
+    )
     urls, group_sizes = orch.group_repos()
     repo_url_groups: List[List[str]] = urls
     repo_group_sizes: List[float] = group_sizes

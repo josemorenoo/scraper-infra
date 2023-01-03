@@ -2,6 +2,7 @@ import boto3
 from botocore.exceptions import ClientError
 from datetime import datetime
 import json
+from time import time
 from typing import Dict
 
 from batch_scraper.manifest.manifest_manager import ManifestManager
@@ -34,15 +35,19 @@ def lambda_handler(event, context):
 
     # update local repo_manifest
     mm = ManifestManager(secrets)
-    mm.update_repo_metadata()
+
+    manifest_start = time.time()
+    local_manifest_path = mm.update_repo_metadata()
+    manifest_end = time.time()
+    print(f"manifest generation time: {round(manifest_end-manifest_start, 2)}")
 
     # upload to S3
     s3_client = boto3.resource("s3")
     s3_client.Bucket("coincommit").upload_file(
-        mm.manifest_path, "assets/repo_manifest.json"
+        local_manifest_path, "assets/repo_manifest.json"
     )
     s3_client.Bucket("coincommit").upload_file(
-        mm.manifest_path,
+        local_manifest_path,
         f'assets/repo_manifest_{datetime.now().strftime("%Y-%m-%d")}.json',
     )
 
