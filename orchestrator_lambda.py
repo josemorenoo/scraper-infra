@@ -187,9 +187,7 @@ def dump_empty_report(report_date):
 
 def master_lambda_handler(event, context):
     start = time.time()
-    for k, v in event.items():
-        print(k, v)
-    return 1
+
     if "start_date" in event and "end_date" in event:
         # pass in start and end to orchestrator for backfilling
         start_date = datetime.strptime(event["start_date"], "%Y-%m-%d")
