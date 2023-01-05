@@ -13,6 +13,7 @@ from botocore.exceptions import ClientError
 from botocore.config import Config
 
 from batch_scraper.orchestrator import Orchestrator
+from batch_scraper.manifest.manifest_manager import ManifestManager
 
 boto_config = Config(
     retries={"max_attempts": 0},
@@ -186,8 +187,15 @@ def dump_empty_report(report_date):
 
 
 def master_lambda_handler(event, context):
-    start = time.time()
+    secrets: Dict[str, str] = get_secrets()
 
+    start = time.time()
+    mm = ManifestManager(secrets)
+    mm.update_repo_metadata()
+    end = time.time()
+    print(f"Took {round(end-start, 2)} to update repo manifest")
+
+    start = time.time()
     if "start_date" in event and "end_date" in event:
         # pass in start and end to orchestrator for backfilling
         start_date = datetime.strptime(event["start_date"], "%Y-%m-%d")
@@ -197,8 +205,9 @@ def master_lambda_handler(event, context):
         )
     else:
         # just use today's date
-        end_date = datetime.now()
+        end_date = datetime.strptime(datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d")
         start_date = end_date - timedelta(1)
+        start_date = datetime.strptime(start_date.strftime("%Y-%m-%d"), "%Y-%m-%d")
 
         print(
             f'Today"s date inferred: orchestrating for {start_date.strftime("%Y-%m-%d")} thru {end_date.strftime("%Y-%m-%d")}'
@@ -209,7 +218,6 @@ def master_lambda_handler(event, context):
     else:
         backfilling = False
 
-    secrets: Dict[str, str] = get_secrets()
     orch = Orchestrator(
         start_date=start_date,
         end_date=end_date,
