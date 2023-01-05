@@ -277,9 +277,9 @@ def master_lambda_handler(event, context):
 
     # join worker reports
     if len(valid_results) > 0:
-        join_reports(valid_results, report_date=event["end_date"])
+        join_reports(valid_results, report_date=end_date)
     else:
-        dump_empty_report(report_date=event["end_date"])
+        dump_empty_report(report_date=end_date)
 
     end = time.time()
     lambda_results = {
