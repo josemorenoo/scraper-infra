@@ -1,11 +1,11 @@
+from birdbot.birdbot import BirdBot
+
 import boto3
 from botocore.exceptions import ClientError
-from datetime import datetime
 import json
-import time
+import os
 from typing import Dict
-
-from batch_scraper.manifest.manifest_manager import ManifestManager
+import time
 
 
 def get_secrets() -> Dict[str, str]:
@@ -30,27 +30,17 @@ def get_secrets() -> Dict[str, str]:
 
 
 def lambda_handler(event, context):
+    # event comes in as a dictionary
 
-    secrets: Dict[str, str] = get_secrets()
+    sts_secrets: Dict[str, str] = get_secrets()
 
-    # update local repo_manifest
-    mm = ManifestManager(secrets)
+    start = time.time()
+    bird = BirdBot(sts_secrets)
+    success = bird.tweet()
 
-    manifest_start = time.time()
-    local_manifest_path = mm.update_repo_metadata()
-    manifest_end = time.time()
-    print(f"manifest generation time: {round(manifest_end-manifest_start, 2)}")
+    # cleanup
+    os.system("rm -rf /tmp/*")
 
-    # upload to S3
-    s3_client = boto3.resource("s3")
-    s3_client.Bucket("coincommit").upload_file(
-        local_manifest_path, "assets/repo_manifest.json"
-    )
-    s3_client.Bucket("coincommit").upload_file(
-        local_manifest_path,
-        f'assets/repo_manifest_{datetime.now().strftime("%Y-%m-%d")}.json',
-    )
-
-    lambda_response = {"status": "done"}
-
+    end = time.time()
+    lambda_response = {"worker_duration_secs": end - start, "success": success}
     return lambda_response

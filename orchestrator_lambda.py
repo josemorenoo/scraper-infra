@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
+from concurrent.futures import wait
+from concurrent.futures import ALL_COMPLETED
 from collections import defaultdict
 import os
 import shutil
@@ -13,7 +15,6 @@ from botocore.exceptions import ClientError
 from botocore.config import Config
 
 from batch_scraper.orchestrator import Orchestrator
-from batch_scraper.manifest.manifest_manager import ManifestManager
 
 boto_config = Config(
     retries={"max_attempts": 0},
@@ -63,7 +64,13 @@ def join_reports(results: str, report_date: str):
         # tally durations for performance tuning
         duration_sec = round(int(decoded_result["worker_duration_secs"]), 3)
         worker_id = decoded_result["worker_id"]
-        durations.append((worker_id, duration_sec))
+        durations.append(
+            (
+                "id_" + str(worker_id),
+                str(duration_sec) + " secs",
+                "aka " + str(round(float(duration_sec) / 60.0, 2)) + " mins",
+            )
+        )
 
         # download and extract report
         report_path_pieces = decoded_result["report_path"].split("/")
@@ -165,68 +172,74 @@ def join_reports(results: str, report_date: str):
                         "loc_changes_by_filetype"
                     ]
 
-    master_report_local_path = f"/tmp/{report_date}.json"
+    report_date_str = report_date.strftime("%Y-%m-%d")
+    master_report_local_path = f"/tmp/{report_date_str}.json"
     with open(master_report_local_path, "w") as fp:
         json.dump(master_report, fp, indent=2)
         print(f"dumped report to {master_report_local_path}")
 
-    object_name = f"reports/{report_date}/{report_date}.json"
+    object_name = f"reports/{report_date_str}/{report_date_str}.json"
     s3_client.Bucket("coincommit").upload_file(master_report_local_path, object_name)
     print("durations: ", durations)
 
 
-def dump_empty_report(report_date):
+def dump_empty_report(report_date: datetime):
+    report_date_str = report_date.strftime("%Y-%m-%d")
+
     master_report = {}
-    master_report_local_path = f"/tmp/{report_date}.json"
+    master_report_local_path = f"/tmp/{report_date_str}.json"
     with open(master_report_local_path, "w") as fp:
         json.dump(master_report, fp, indent=2)
         print(f"dumped EMPTY report to {master_report_local_path}")
 
-    object_name = f"reports/{report_date}/{report_date}.json"
+    object_name = f"reports/{report_date_str}/{report_date_str}.json"
     s3_client.Bucket("coincommit").upload_file(master_report_local_path, object_name)
 
 
 def master_lambda_handler(event, context):
     secrets: Dict[str, str] = get_secrets()
 
-    start = time.time()
-    mm = ManifestManager(secrets)
-    mm.update_repo_metadata()
-    end = time.time()
-    print(f"Took {round(end-start, 2)} to update repo manifest")
-
-    start = time.time()
-    if "start_date" in event and "end_date" in event:
-        # pass in start and end to orchestrator for backfilling
-        start_date = datetime.strptime(event["start_date"], "%Y-%m-%d")
-        end_date = datetime.strptime(event["end_date"], "%Y-%m-%d")
-        print(
-            f'Dates Passed In: orchestrating for {start_date.strftime("%Y-%m-%d")} thru {end_date.strftime("%Y-%m-%d")}'
-        )
-    else:
-        # just use today's date
-        end_date = datetime.strptime(datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d")
-        start_date = end_date - timedelta(1)
-        start_date = datetime.strptime(start_date.strftime("%Y-%m-%d"), "%Y-%m-%d")
-
-        print(
-            f'Today"s date inferred: orchestrating for {start_date.strftime("%Y-%m-%d")} thru {end_date.strftime("%Y-%m-%d")}'
-        )
-
     if "backfilling" in event:
         backfilling = bool(event["backfilling"])
     else:
         backfilling = False
 
+    start = time.time()
+    if "start_date" in event and "end_date" in event:
+        # pass in start and end to orchestrator for backfilling
+        start_date: datetime = datetime.strptime(event["start_date"], "%Y-%m-%d")
+        end_date: datetime = datetime.strptime(event["end_date"], "%Y-%m-%d")
+        print(
+            f'Dates Passed In: orchestrating for {start_date.strftime("%Y-%m-%d")} thru {end_date.strftime("%Y-%m-%d")}'
+        )
+    else:
+        # just use today's date
+        end_date: datetime = datetime.strptime(
+            datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d"
+        )
+        start_date = end_date - timedelta(1)
+        start_date: datetime = datetime.strptime(
+            start_date.strftime("%Y-%m-%d"), "%Y-%m-%d"
+        )
+
+        print(
+            f"Today's date inferred: orchestrating for {start_date.strftime('%Y-%m-%d')} thru {end_date.strftime('%Y-%m-%d')}"
+        )
+
     orch = Orchestrator(
         start_date=start_date,
         end_date=end_date,
         sts_secrets=secrets,
+        lambda_mem_limit_mb=800.0,
         backfilling=backfilling,
+        download_manifest_from_s3=True,
     )
     urls, group_sizes = orch.group_repos()
     repo_url_groups: List[List[str]] = urls
     repo_group_sizes: List[float] = group_sizes
+    print(
+        f"calculated repo groupings for workers, seconds remaining: {context.get_remaining_time_in_millis()/1000.0}"
+    )
     print(f"repo_url_groups: {len(repo_url_groups)}")
 
     for i, (repo_group, group_size) in enumerate(
@@ -259,9 +272,13 @@ def master_lambda_handler(event, context):
                 executor.submit(invoke_worker, repo_group, i)
                 for i, repo_group in enumerate(repo_url_groups)
             ]
+
             for future in as_completed(futures):
                 worker_result = future.result()
                 results.append(worker_result)
+                print(
+                    f"response came back from worker, seconds remaining: {context.get_remaining_time_in_millis() / 1000.0}"
+                )
                 print(worker_result)
 
     """
@@ -272,6 +289,10 @@ def master_lambda_handler(event, context):
             results.append(response)
     print(*results, sep="\n")
     """
+
+    print(
+        f"joining valid resuts, seconds remaining: {context.get_remaining_time_in_millis() / 1000.0}"
+    )
 
     # only join valid results
     valid_results = [
@@ -289,6 +310,10 @@ def master_lambda_handler(event, context):
     else:
         dump_empty_report(report_date=end_date)
 
+    print(
+        f"done generating reports, seconds remaining: {context.get_remaining_time_in_millis() / 1000.0}"
+    )
+
     end = time.time()
     lambda_results = {
         "results_count": len(results),
@@ -298,6 +323,10 @@ def master_lambda_handler(event, context):
         "duration": round(end - start, 3),
         "report": f'{end_date.strftime("%Y-%m-%d")}.json',
     }
+
+    print(
+        f"all done, seconds remaining: {context.get_remaining_time_in_millis() / 1000.0}"
+    )
 
     print("done orchestrating")
     return lambda_results
