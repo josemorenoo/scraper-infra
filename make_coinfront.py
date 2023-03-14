@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import os
 from git.repo.base import Repo
 import shutil
@@ -6,8 +7,8 @@ import sys
 
 
 if __name__ == "__main__":
-    # report_date = datetime.today()
-    report_date = datetime(2023, 3, 12)
+    # report_date = datetime(2023, 3, 13)
+    report_date = datetime.today()
     report_date_str = report_date.strftime("%Y-%m-%d")
 
     # clone birdbot repo to get summary_generator
@@ -38,7 +39,15 @@ if __name__ == "__main__":
     from birdbot.report_parser.report_util import generate_summary_report
 
     summary_report_path = generate_summary_report(report_date)
-    os.system(f"cp {summary_report_path} coinfront/coincommit/public/summary.json")
+    os.system(f"cp {summary_report_path} coinfront/coincommit/src/summary.json")
+
+    # timestamp the build
+    timestamp_path = "/tmp/updated_on.json"
+
+    with open(timestamp_path, "w") as fp:
+        json.dump({"date": report_date_str}, fp)
+
+    os.system(f"cp {timestamp_path} coinfront/coincommit/src/updated_on.json")
 
     # re-build and deploy page
     os.system(
@@ -48,6 +57,7 @@ if __name__ == "__main__":
     # cleanup
     os.remove(f"/tmp/{report_date_str}.json")
     os.remove(summary_report_path)
+    os.remove(timestamp_path)
     shutil.rmtree("birdbot")
     shutil.rmtree("coinfront")
 
