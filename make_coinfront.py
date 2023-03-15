@@ -5,9 +5,10 @@ from git.repo.base import Repo
 import shutil
 import sys
 
+from scripts.create_weekly_reports import download_combine_weekly_json_files
+
 
 if __name__ == "__main__":
-    # report_date = datetime(2023, 3, 13)
     report_date = datetime.today()
     report_date_str = report_date.strftime("%Y-%m-%d")
 
@@ -19,6 +20,7 @@ if __name__ == "__main__":
     else:
         os.makedirs(clone_to, exist_ok=True)
     Repo.clone_from(repo_link, clone_to)
+    os.system("cp config/local_bird_config.json birdbot/config/local_bird_config.json")
 
     # get coinfront repo
     repo_link = "https://github.com/josemorenoo/coinfront.git"
@@ -38,8 +40,22 @@ if __name__ == "__main__":
     sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "birdbot")))
     from birdbot.report_parser.report_util import generate_summary_report
 
-    summary_report_path = generate_summary_report(report_date)
+    # make daily summary
+    summary_report_path = generate_summary_report(report_date, mode="DAILY")
     os.system(f"cp {summary_report_path} coinfront/coincommit/src/summary.json")
+    os.system(f"aws s3 cp {summary_report_path} s3://coinfront/assets/summary.json")
+
+    # make weekly summary
+    weekly_aggregation_path = download_combine_weekly_json_files(report_date)
+    weekly_summary_report_path = generate_summary_report(
+        report_date, weekly_aggregation_path, mode="WEEKLY"
+    )
+    os.system(
+        f"cp {weekly_summary_report_path} coinfront/coincommit/src/weekly_summary.json"
+    )
+    os.system(
+        f"aws s3 cp {weekly_summary_report_path} s3://coinfront/assets/weekly_summary.json"
+    )
 
     # timestamp the build
     timestamp_path = "/tmp/updated_on.json"
@@ -49,22 +65,15 @@ if __name__ == "__main__":
 
     os.system(f"cp {timestamp_path} coinfront/coincommit/src/updated_on.json")
 
-    # re-build and deploy page
+    # empty bucket then re-build and deploy page
     os.system(
-        f"cd coinfront/coincommit && npm install && npm run build && npm run deploy"
+        f"aws s3 rm s3://coinfront --recursive && cd coinfront/coincommit && npm install && npm run build && npm run deploy"
     )
 
     # cleanup
     os.remove(f"/tmp/{report_date_str}.json")
     os.remove(summary_report_path)
+    os.remove(weekly_aggregation_path)
     os.remove(timestamp_path)
     shutil.rmtree("birdbot")
     shutil.rmtree("coinfront")
-
-    # update lambda
-    """
-    os.system(
-        f"aws lambda update-function-code --function-name birdbot --s3-bucket coincommit --s3-key deployment-packages/birdbot-deployment.zip"
-    )
-
-    """

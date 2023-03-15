@@ -1,3 +1,4 @@
 
 *.zip
 .DS_Store
+config/local_bird_config.json
