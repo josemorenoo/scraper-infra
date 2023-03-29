@@ -240,3 +240,7 @@ def lambda_handler(event, context):
     lambda_response = {"status": "done"}
 
     return lambda_response
+
+
+if __name__ == "__main__":
+    lambda_handler()
