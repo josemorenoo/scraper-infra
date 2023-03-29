@@ -14,12 +14,13 @@ def download_combine_weekly_json_files(
 ):
 
     start_date = end_date - timedelta(days=6)
-
     weekly_data = {}
+
+    s3 = boto3.resource("s3")
 
     for i in range((end_date - start_date).days + 1):
         datestr = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
-        s3_object = bucket.Object(f"reports/{datestr}/{datestr}.json")
+        s3_object = s3.Bucket("coincommit").Object(f"reports/{datestr}/{datestr}.json")
         try:
             file_content = s3_object.get()["Body"].read().decode("utf-8")
             daily_data = json.loads(file_content)
