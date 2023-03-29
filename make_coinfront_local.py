@@ -116,6 +116,7 @@ if __name__ == "__main__":
     os.system(
         f"cp config/local_bird_config.json {clone_to}/config/local_bird_config.json"
     )
+    os.system(f"cp {clone_to} birdbot")
 
     # get coinfront repo
     repo_link = "https://github.com/josemorenoo/coinfront.git"
