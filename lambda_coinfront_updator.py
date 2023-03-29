@@ -113,7 +113,7 @@ def get_secrets() -> Dict[str, str]:
     return json.loads(secrets)
 
 
-def lambda_handler(event, context):
+def lambda_handler():
     sts_secrets = get_secrets()
 
     # report_date = datetime.today()
