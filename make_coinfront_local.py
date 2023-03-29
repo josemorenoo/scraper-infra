@@ -1,7 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
-from git.repo.base import Repo
 import shutil
 import sys
 import time
