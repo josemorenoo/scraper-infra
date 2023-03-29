@@ -101,6 +101,19 @@ if __name__ == "__main__":
     if os.path.exists("/tmp/coinfront"):
         shutil.rmtree("/tmp/coinfront")
 
+    # get birdbot repo
+    repo_link = "https://github.com/josemorenoo/birdbot.git"
+    clone_to = "/home/ec2-user/scraper-infra/birdbot"
+    if os.path.exists(clone_to):
+        shutil.rmtree(clone_to)
+    else:
+        os.makedirs(clone_to, exist_ok=True)
+    # Repo.clone_from(repo_link, clone_to)
+    os.system(f"git clone {repo_link} {clone_to}")
+    os.system(
+        f"cp config/local_bird_config.json {clone_to}/config/local_bird_config.json"
+    )
+
     # get coinfront repo
     repo_link = "https://github.com/josemorenoo/coinfront.git"
     clone_to = "/tmp/coinfront"
@@ -143,7 +156,7 @@ if __name__ == "__main__":
             )
 
     # setup birdbot repo to create summary report
-    sys.path.append("/home/ec2-user/birdbot")
+    sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "birdbot")))
 
     from birdbot.report_parser.report_util import generate_summary_report
 
@@ -203,5 +216,7 @@ if __name__ == "__main__":
     os.remove(summary_report_path)
     os.remove(weekly_aggregation_path)
     os.remove(timestamp_path)
+    if os.path.exists("/home/ec2-user/scraper-infra/birdbot"):
+        shutil.rmtree("/home/ec2-user/scraper-infra/birdbot")
     if os.path.exists("/tmp/coinfront"):
         shutil.rmtree("/tmp/coinfront")
