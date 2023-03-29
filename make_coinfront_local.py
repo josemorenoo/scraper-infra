@@ -92,11 +92,8 @@ if __name__ == "__main__":
 
     report_date = datetime.today()
     report_date_str = report_date.strftime("%Y-%m-%d")
-
-    # report_date = datetime.today()
-    # report_date_str = report_date.strftime("%Y-%m-%d")
-    report_date_str = "2023-03-24"
-    report_date = datetime(2023, 3, 24)
+    # report_date_str = "2023-03-24"
+    # report_date = datetime(2023, 3, 24)
     print(f"today is: {report_date_str}")
 
     if os.path.exists("/tmp/coinfront"):
