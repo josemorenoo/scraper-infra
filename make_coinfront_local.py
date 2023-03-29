@@ -98,25 +98,8 @@ if __name__ == "__main__":
     report_date = datetime(2023, 3, 24)
     print(f"today is: {report_date_str}")
 
-    # remove old container's code
-    if os.path.exists("/tmp/birdbot"):
-        shutil.rmtree("/tmp/birdbot")
     if os.path.exists("/tmp/coinfront"):
         shutil.rmtree("/tmp/coinfront")
-
-    # get birdbot repo
-    repo_link = "https://github.com/josemorenoo/birdbot.git"
-    clone_to = "/tmp/birdbot"
-    if os.path.exists(clone_to):
-        shutil.rmtree(clone_to)
-    else:
-        os.makedirs(clone_to, exist_ok=True)
-    # Repo.clone_from(repo_link, clone_to)
-    os.system(f"git clone {repo_link} {clone_to}")
-    os.system(
-        f"cp config/local_bird_config.json {clone_to}/config/local_bird_config.json"
-    )
-    os.system(f"cp {clone_to} birdbot")
 
     # get coinfront repo
     repo_link = "https://github.com/josemorenoo/coinfront.git"
@@ -160,7 +143,7 @@ if __name__ == "__main__":
             )
 
     # setup birdbot repo to create summary report
-    sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "birdbot")))
+    sys.path.append("/home/ec2-user/birdbot")
 
     from birdbot.report_parser.report_util import generate_summary_report
 
@@ -220,7 +203,5 @@ if __name__ == "__main__":
     os.remove(summary_report_path)
     os.remove(weekly_aggregation_path)
     os.remove(timestamp_path)
-    if os.path.exists("/tmp/birdbot"):
-        shutil.rmtree("/tmp/birdbot")
     if os.path.exists("/tmp/coinfront"):
         shutil.rmtree("/tmp/coinfront")
