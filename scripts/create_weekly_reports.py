@@ -22,6 +22,7 @@ def download_combine_weekly_json_files(
             daily_data = json.loads(file_content)
         except:
             print(f"Error downloading or parsing data for {datestr}")
+            continue
         for token, metadata in daily_data.items():
             if token in weekly_data:
                 existing_token_data = weekly_data[token]
