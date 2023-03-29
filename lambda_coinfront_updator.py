@@ -11,6 +11,7 @@ import time
 from typing import Dict
 
 s3 = boto3.resource("s3")
+s3_client = boto3.client("s3")
 bucket_name = "coincommit"
 bucket = s3.Bucket(bucket_name)
 
@@ -31,6 +32,7 @@ def download_combine_weekly_json_files(
             daily_data = json.loads(file_content)
         except:
             print(f"Error downloading or parsing data for {datestr}")
+            continue
         for token, metadata in daily_data.items():
             if token in weekly_data:
                 existing_token_data = weekly_data[token]
@@ -114,8 +116,17 @@ def get_secrets() -> Dict[str, str]:
 def lambda_handler(event, context):
     sts_secrets = get_secrets()
 
-    report_date = datetime.today()
-    report_date_str = report_date.strftime("%Y-%m-%d")
+    # report_date = datetime.today()
+    # report_date_str = report_date.strftime("%Y-%m-%d")
+    report_date_str = "2023-03-24"
+    report_date = datetime(2023, 3, 24)
+    print(f"today is: {report_date_str}")
+
+    # remove old container's code
+    if os.path.exists("/tmp/birdbot"):
+        shutil.rmtree("/tmp/birdbot")
+    if os.path.exists("/tmp/coinfront"):
+        shutil.rmtree("/tmp/coinfront")
 
     # get coinfront repo
     repo_link = "https://github.com/josemorenoo/coinfront.git"
@@ -127,11 +138,21 @@ def lambda_handler(event, context):
     # Repo.clone_from(repo_link, clone_to)
     os.system(f"git clone {repo_link} {clone_to}")
 
+    clone_time = 0.0
+    while not os.path.exists(clone_to):
+        clone_time += 0.5
+        time.sleep(0.5)
+        if clone_time > 30.0:
+            print(f"cloning coinfront took more than 30sec, breaking")
+            break
+
     # pull down existing daily report
     bucket = "coincommit"
     s3_object = f"reports/{report_date_str}/{report_date_str}.json"
     daily_report_local_path = f"/tmp/{report_date_str}.json"
-    os.system(f"aws s3 cp s3://{bucket}/{s3_object} {daily_report_local_path}")
+
+    print(f"downloading s3://{bucket}/{s3_object} to {daily_report_local_path}")
+    s3_client.download_file(bucket, s3_object, daily_report_local_path)
 
     print(os.listdir("/tmp"))
 
@@ -144,25 +165,28 @@ def lambda_handler(event, context):
             f"waiting {secs_waited}sec for s3://{bucket}/{s3_object} to download to {daily_report_local_path}"
         )
         if secs_waited > 10.0:
-            break
+            raise Exception(
+                f"waited ten seconds, couldn't find daily report at {s3_object}"
+            )
 
     # setup birdbot repo to create summary report
     sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "birdbot")))
 
     from birdbot.report_parser.report_util import generate_summary_report
 
-    print(os.listdir("/tmp"))
-
     # make daily summary
+    print(f"lambda code, sts_secrets: {len(sts_secrets)}")
     summary_report_path = generate_summary_report(
         report_date=report_date,  # IGNORED, daily_report_local_path is used
         report_path=daily_report_local_path,
         mode="DAILY",
         sts_secrets=sts_secrets,
     )
-    print(summary_report_path)
+    print("summary report generated at: ", summary_report_path)
     if os.path.exists(summary_report_path):
-        os.system(f"cp {summary_report_path} coinfront/coincommit/src/summary.json")
+        os.system(
+            f"cp {summary_report_path} /tmp/coinfront/coincommit/src/summary.json"
+        )
     else:
         raise Exception(
             f"summary.json did not exist at {summary_report_path} oh nonoooo"
@@ -171,11 +195,12 @@ def lambda_handler(event, context):
     # make weekly summary
     weekly_aggregation_path = download_combine_weekly_json_files(report_date)
     weekly_summary_report_path = generate_summary_report(
-        report_date, weekly_aggregation_path, mode="WEEKLY"
+        report_date, weekly_aggregation_path, mode="WEEKLY", sts_secrets=sts_secrets
     )
     if os.path.exists(weekly_summary_report_path):
+        print("weekly aggregation generated at", weekly_summary_report_path)
         os.system(
-            f"cp {weekly_summary_report_path} coinfront/coincommit/src/weekly_summary.json"
+            f"cp {weekly_summary_report_path} /tmp/coinfront/coincommit/src/weekly_summary.json"
         )
     else:
         raise Exception(
@@ -188,26 +213,29 @@ def lambda_handler(event, context):
     with open(timestamp_path, "w") as fp:
         json.dump({"date": report_date_str}, fp)
 
-    os.system(f"cp {timestamp_path} coinfront/coincommit/src/updated_on.json")
+    os.system(f"cp {timestamp_path} /tmp/coinfront/coincommit/src/updated_on.json")
 
     # empty bucket then re-build and deploy page
+    s3.Bucket("coinfront").objects.all().delete()
     os.system(
-        f"aws s3 rm s3://coinfront --recursive && cd coinfront/coincommit && npm install && npm run build && npm run deploy"
+        f"cd /tmp/coinfront/coincommit && npm install && npm run build && npm run deploy"
     )
 
     # upload summaries
-    os.system(
-        f"aws s3 cp {weekly_summary_report_path} s3://coinfront/assets/weekly_summary.json"
+    s3_client.upload_file(
+        daily_report_local_path, "coinfront", "assets/weekly_summary.json"
     )
-    os.system(f"aws s3 cp {summary_report_path} s3://coinfront/assets/summary.json")
+    s3_client.upload_file(summary_report_path, "coinfront", "assets/summary.json")
 
     # cleanup
     os.remove(f"/tmp/{report_date_str}.json")
     os.remove(summary_report_path)
     os.remove(weekly_aggregation_path)
     os.remove(timestamp_path)
-    shutil.rmtree("/tmp/birdbot")
-    shutil.rmtree("/tmp/coinfront")
+    if os.path.exists("/tmp/birdbot"):
+        shutil.rmtree("/tmp/birdbot")
+    if os.path.exists("/tmp/coinfront"):
+        shutil.rmtree("/tmp/coinfront")
 
     lambda_response = {"status": "done"}
 

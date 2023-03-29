@@ -72,6 +72,7 @@ def download_combine_weekly_json_files(
             weekly_data[token]["changed_methods"] = list(
                 set(metadata["changed_methods"])
             )
+
     weekly_file_content = json.dumps(weekly_data, indent=2)
     weekly_aggregation_path = f"/tmp/weekly.json"
     with open(weekly_aggregation_path, "w") as f:
