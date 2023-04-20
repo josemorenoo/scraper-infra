@@ -7,6 +7,7 @@ import time
 import boto3
 
 from scripts.create_weekly_reports import download_combine_weekly_json_files
+from scripts.create_monthly_reports import download_combine_monthly_json_files
 
 
 if __name__ == "__main__":
@@ -112,6 +113,21 @@ if __name__ == "__main__":
             f"weekly_summary.json did not exist at {weekly_summary_report_path} oh nonoooo"
         )
 
+    # make monthly summary
+    monthly_aggregation_path = download_combine_monthly_json_files(report_date)
+    monthly_summary_report_path = generate_summary_report(
+        report_date, monthly_aggregation_path, mode="MONTHLY"
+    )
+    if os.path.exists(monthly_summary_report_path):
+        print("monthly aggregation generated at", monthly_summary_report_path)
+        os.system(
+            f"cp {monthly_summary_report_path} /tmp/coinfront/coincommit/src/monthly_summary.json"
+        )
+    else:
+        raise Exception(
+            f"monthly_summary.json did not exist at {monthly_summary_report_path} oh nonoooo"
+        )
+
     # timestamp the build
     timestamp_path = "/tmp/updated_on.json"
 
@@ -128,7 +144,10 @@ if __name__ == "__main__":
 
     # upload summaries
     s3_client.upload_file(
-        daily_report_local_path, "coinfront", "assets/weekly_summary.json"
+        weekly_summary_report_path, "coinfront", "assets/weekly_summary.json"
+    )
+    s3_client.upload_file(
+        monthly_summary_report_path, "coinfront", "assets/monthly_summary.json"
     )
     s3_client.upload_file(summary_report_path, "coinfront", "assets/summary.json")
 
