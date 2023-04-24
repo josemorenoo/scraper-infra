@@ -24,7 +24,7 @@ if __name__ == "__main__":
         shutil.rmtree("/tmp/coinfront")
 
     # get birdbot repo
-    repo_link = "https://github.com/josemorenoo/birdbot.git"
+    repo_link = "git@github.com:josemorenoo/birdbot.git"
     clone_to = "/home/ec2-user/scraper-infra/birdbot"
     if os.path.exists(clone_to):
         shutil.rmtree(clone_to)
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     )
 
     # get coinfront repo
-    repo_link = "https://github.com/josemorenoo/coinfront.git"
+    repo_link = "git@github.com:josemorenoo/coinfront.git"
     clone_to = "/tmp/coinfront"
     if os.path.exists(clone_to):
         shutil.rmtree(clone_to)
