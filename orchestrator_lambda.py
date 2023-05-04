@@ -105,6 +105,10 @@ def join_reports(results: str, report_date: str):
                         "changed_methods"
                     ]
 
+                    master_report[token_name]["active_repos"] += token_data[
+                        "active_repos"
+                    ]
+
                     for fext_name, fext_count in token_data["file_extensions"].items():
                         if fext_name in master_report[token_name]["file_extensions"]:
                             master_report[token_name]["file_extensions"][
@@ -170,6 +174,16 @@ def join_reports(results: str, report_date: str):
 
                     master_report[token_name]["loc_changes_by_filetype"] = token_data[
                         "loc_changes_by_filetype"
+                    ]
+
+                    master_report[token_name]["active_repos"] = token_data[
+                        "active_repos"
+                    ]
+
+                    # these don't need to be appended, just assigned
+                    master_report[token_name]["description"] = token_data["description"]
+                    master_report[token_name]["project_created_cmc"] = token_data[
+                        "project_created_cmc"
                     ]
 
     report_date_str = report_date.strftime("%Y-%m-%d")
