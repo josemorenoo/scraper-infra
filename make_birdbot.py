@@ -18,9 +18,9 @@ print(f"cloned repo to  {package_name}birdbot")
 with open(f"{package_name}birdbot/requirements.txt", "r") as req_file:
     reqs = [r.strip("\n") for r in req_file.readlines()]
     for r in reqs:
-        install = f"python3.9 -m pip install --target ./{package_name} {r}"
+        install = f"python3.9 -m pip install --target ./{package_name} '{r}'"
         os.system(install)
-#os.system(f"rm -rf ./{package_name}plotly/express")
+# os.system(f"rm -rf ./{package_name}plotly/express")
 
 # create deployment package
 if os.path.exists("birdbot-deployment.zip"):

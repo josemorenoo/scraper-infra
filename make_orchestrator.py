@@ -18,7 +18,8 @@ print(f"cloned repo to  {package_name}batch_scraper")
 with open(f"{package_name}batch_scraper/requirements.txt", "r") as req_file:
     reqs = [r.strip("\n") for r in req_file.readlines()]
     for r in reqs:
-        os.system(f"pip3 install --target ./{package_name} {r}")
+        print(r)
+        os.system(f"pip3 install  --target ./{package_name} '{r}'")
 
 # create deployment package
 if os.path.exists("orchestrator-deployment.zip"):
