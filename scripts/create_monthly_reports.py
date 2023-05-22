@@ -34,10 +34,16 @@ def download_combine_monthly_json_files(
                 existing_token_data["distinct_authors"].extend(
                     metadata["distinct_authors"]
                 )
+                existing_token_data["active_repos"].extend(metadata["active_repos"])
                 existing_token_data["commit_urls"].extend(metadata["commit_urls"])
                 existing_token_data["changed_methods"].extend(
                     metadata["changed_methods"]
                 )
+                # these don't need to be appended, just assigned
+                existing_token_data["description"] = metadata["description"]
+                existing_token_data["project_created_cmc"] = metadata[
+                    "project_created_cmc"
+                ]
 
                 merged_dict = existing_token_data["file_extensions"].copy()
                 for filetype, filecount in metadata["file_extensions"].items():

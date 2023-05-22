@@ -23,9 +23,11 @@ if __name__ == "__main__":
     if os.path.exists("/tmp/coinfront"):
         shutil.rmtree("/tmp/coinfront")
 
+    usr = "/home/ec2-user"
+
     # get birdbot repo
     repo_link = "git@github.com:josemorenoo/birdbot.git"
-    clone_to = "/home/ec2-user/scraper-infra/birdbot"
+    clone_to = f"{usr}/scraper-infra/birdbot"
     if os.path.exists(clone_to):
         shutil.rmtree(clone_to)
     else:
@@ -141,6 +143,9 @@ if __name__ == "__main__":
     os.system(
         f"cd /tmp/coinfront/coincommit && npm install && npm run build && npm run deploy"
     )
+
+    # upload daily raw data
+    s3_client.upload_file(daily_report_local_path, "coinfront", "assets/raw.json")
 
     # upload summaries
     s3_client.upload_file(
