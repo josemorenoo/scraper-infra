@@ -34,10 +34,15 @@ def download_combine_monthly_json_files(
                 existing_token_data["distinct_authors"].extend(
                     metadata["distinct_authors"]
                 )
-                if "active_repos" in existing_token_data:
-                    existing_token_data["active_repos"].extend(metadata["active_repos"])
+                if "active_repos" in metadata:
+                    if "active_repos" in existing_token_data:
+                        existing_token_data["active_repos"].extend(
+                            metadata["active_repos"]
+                        )
+                    else:
+                        existing_token_data["active_repos"] = metadata["active_repos"]
                 else:
-                    existing_token_data["active_repos"] = metadata["active_repos"]
+                    existing_token_data["active_repos"] = []
 
                 existing_token_data["commit_urls"].extend(metadata["commit_urls"])
                 existing_token_data["changed_methods"].extend(
