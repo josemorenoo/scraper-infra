@@ -23,9 +23,11 @@ if __name__ == "__main__":
     if os.path.exists("/tmp/coinfront"):
         shutil.rmtree("/tmp/coinfront")
 
+    usr = "/home/ec2-user"
+
     # get birdbot repo
     repo_link = "git@github.com:josemorenoo/birdbot.git"
-    clone_to = "/home/ec2-user/scraper-infra/birdbot"
+    clone_to = f"{usr}/scraper-infra/birdbot"
     if os.path.exists(clone_to):
         shutil.rmtree(clone_to)
     else:
