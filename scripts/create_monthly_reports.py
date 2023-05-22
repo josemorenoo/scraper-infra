@@ -49,7 +49,10 @@ def download_combine_monthly_json_files(
                     metadata["changed_methods"]
                 )
                 # these don't need to be appended, just assigned
-                existing_token_data["description"] = metadata["description"]
+                if "description" in metadata:
+                    existing_token_data["description"] = metadata["description"]
+                else:
+                    existing_token_data["description"] = []
                 existing_token_data["project_created_cmc"] = metadata[
                     "project_created_cmc"
                 ]
