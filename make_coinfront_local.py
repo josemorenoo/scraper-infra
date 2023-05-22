@@ -142,6 +142,9 @@ if __name__ == "__main__":
         f"cd /tmp/coinfront/coincommit && npm install && npm run build && npm run deploy"
     )
 
+    # upload daily raw data
+    s3_client.upload_file(daily_report_local_path, "coinfront", "assets/raw.json")
+
     # upload summaries
     s3_client.upload_file(
         weekly_summary_report_path, "coinfront", "assets/weekly_summary.json"
