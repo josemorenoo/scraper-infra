@@ -53,9 +53,13 @@ def download_combine_monthly_json_files(
                     existing_token_data["description"] = metadata["description"]
                 else:
                     existing_token_data["description"] = []
-                existing_token_data["project_created_cmc"] = metadata[
-                    "project_created_cmc"
-                ]
+
+                if "project_created_cmc" in metadata:
+                    existing_token_data["project_created_cmc"] = metadata[
+                        "project_created_cmc"
+                    ]
+                else:
+                    existing_token_data["project_created_cmc"] = []
 
                 merged_dict = existing_token_data["file_extensions"].copy()
                 for filetype, filecount in metadata["file_extensions"].items():
