@@ -137,6 +137,7 @@ if __name__ == "__main__":
         json.dump({"date": report_date_str}, fp)
 
     os.system(f"cp {timestamp_path} /tmp/coinfront/coincommit/src/updated_on.json")
+    os.system(f"cp {daily_report_local_path} /tmp/coinfront/coincommit/src/raw.json")
 
     # empty bucket then re-build and deploy page
     s3.Bucket("coinfront").objects.all().delete()
