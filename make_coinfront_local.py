@@ -60,6 +60,9 @@ if __name__ == "__main__":
     bucket = "coincommit"
     s3_object = f"reports/{report_date_str}/{report_date_str}.json"
     daily_report_local_path = f"/tmp/{report_date_str}.json"
+    weekly_report_local_path = f"/tmp/weekly_raw.json"
+    monthly_report_local_path = f"/tmp/monthly_raw.json"
+
 
     print(f"downloading s3://{bucket}/{s3_object} to {daily_report_local_path}")
     s3_client.download_file(bucket, s3_object, daily_report_local_path)

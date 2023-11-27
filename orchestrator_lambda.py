@@ -70,32 +70,41 @@ def _update_master_report(master_report, token_name, token_data):
 
 def join_reports(s3_report_paths: List[str], report_date_str: str, report_name: str):
     """
-    Given a list of s3 report paths, combine them into a single json file
+    Given a list of S3 report paths, combine them into a single JSON file.  If a report does not exist in S3, skip it
     """
     master_report = {}
     assembly_dir = "/tmp/reports_to_join/"
+    s3_client = boto3.client('s3')
 
     for report_location in s3_report_paths:
-        # download and extract report
         report_path_pieces = report_location.split("/")
         bucket = report_path_pieces[2]
         report_path = "/".join(report_path_pieces[3:])
         local_report_path = assembly_dir + report_path_pieces[-1]
-        s3_client.Bucket(bucket).download_file(report_path, local_report_path)
 
+        # Check if report exists in S3
+        try:
+            s3_client.head_object(Bucket=bucket, Key=report_path)
+        except ClientError:
+            # Skip this report if it does not exist
+            print(f"Report not found: {report_location}")
+            continue
+
+        # Download and process the report
+        s3_client.download_file(bucket, report_path, local_report_path)
         with open(local_report_path, "r") as f:
             worker_report = json.load(f)
             for token_name, token_data in worker_report.items():
                 _update_master_report(master_report, token_name, token_data)
 
-    # upload master report
+    # Upload master report
     master_report_local_path = f"/tmp/{report_name}.json"
     with open(master_report_local_path, "w") as fp:
         json.dump(master_report, fp, indent=2)
-        print(f"dumped report to {master_report_local_path}")
+        print(f"Dumped report to {master_report_local_path}")
 
     object_name = f"reports/{report_date_str}/{report_name}.json"
-    s3_client.Bucket("coincommit").upload_file(master_report_local_path, object_name)
+    s3_client.upload_file(master_report_local_path, object_name)
     print(f"Uploaded {master_report_local_path} to {object_name}")
 
 
@@ -261,26 +270,26 @@ def dump_empty_report(report_date: datetime):
     s3_client.Bucket("coincommit").upload_file(master_report_local_path, object_name)
 
 def _get_date_range(days: int):
-        # make weekly raw report
-        end_date: datetime = datetime.strptime(
-            datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d"
-        )
-        start_date = end_date - timedelta(7)
-        start_date: datetime = datetime.strptime(
-            start_date.strftime("%Y-%m-%d"), "%Y-%m-%d"
-        )
-        yield range((end_date - start_date).days + 1)
+    # make weekly raw report
+    end_date: datetime = datetime.strptime(
+        datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d"
+    )
+    start_date = end_date - timedelta(days)
+    start_date: datetime = datetime.strptime(
+        start_date.strftime("%Y-%m-%d"), "%Y-%m-%d"
+    )
+    yield range((end_date - start_date).days + 1)
 
 def _generate_windowed_report(range_days, report_name):
-        today = datetime.strptime(datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d")
-        report_range = _get_date_range(days=range_days)
-        s3_report_paths = [
-            f"s3://coincommit/reports/{report_date_str}/{report_date_str}.json"
-            for report_date_str in report_range
-        ]
-        join_reports(
-            s3_report_paths, report_date_str=today, report_name=report_name
-        )
+    today = datetime.strptime(datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d")
+    report_range = _get_date_range(days=range_days)
+    s3_report_paths = [
+        f"s3://coincommit/reports/{report_date_str}/{report_date_str}.json"
+        for report_date_str in report_range
+    ]
+    join_reports(
+        s3_report_paths, report_date_str=today, report_name=report_name
+    )
 
 def master_lambda_handler(event, context):
     secrets: Dict[str, str] = get_secrets()
