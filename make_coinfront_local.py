@@ -140,6 +140,12 @@ if __name__ == "__main__":
     os.system(
         f"cp {daily_report_local_path} /tmp/coinfront/coincommit/src/daily_raw.json"
     )
+    os.system(
+        f"cp {weekly_report_local_path} /tmp/coinfront/coincommit/src/weekly_raw.json"
+    )
+    os.system(
+        f"cp {monthly_report_local_path} /tmp/coinfront/coincommit/src/monthly_raw.json"
+    )
 
     # empty bucket then re-build and deploy page
     s3.Bucket("coinfront").objects.all().delete()
@@ -147,8 +153,10 @@ if __name__ == "__main__":
         f"cd /tmp/coinfront/coincommit && npm install && npm run build && npm run deploy"
     )
 
-    # upload daily raw data
+    # upload raw data
     s3_client.upload_file(daily_report_local_path, "coinfront", "assets/daily_raw.json")
+    s3_client.upload_file(weekly_report_local_path, "coinfront", "assets/weekly_raw.json")
+    s3_client.upload_file(monthly_report_local_path, "coinfront", "assets/monthly_raw.json")
 
     # upload summaries
     s3_client.upload_file(

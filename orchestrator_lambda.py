@@ -45,6 +45,29 @@ def get_secrets() -> Dict[str, str]:
     return json.loads(secrets)
 
 
+def _update_master_report(master_report, token_name, token_data):
+    if token_name not in master_report:
+        master_report[token_name] = token_data
+        return
+
+    # Aggregate data for existing token
+    for key in ["commit_count", "lines_of_code", "commit_messages", "distinct_authors", "commit_urls", "changed_methods", "active_repos"]:
+        master_report[token_name][key] += token_data[key]
+
+    # File extensions
+    for fext_name, fext_count in token_data["file_extensions"].items():
+        master_report[token_name]["file_extensions"].setdefault(fext_name, 0)
+        master_report[token_name]["file_extensions"][fext_name] += fext_count
+
+    # LOC changes by filetype
+    for fext_action, fext_data in token_data["loc_changes_by_filetype"].items():
+        if fext_action not in master_report[token_name]["loc_changes_by_filetype"]:
+            master_report[token_name]["loc_changes_by_filetype"][fext_action] = fext_data
+        else:
+            for fext_name, fext_count in fext_data.items():
+                master_report[token_name]["loc_changes_by_filetype"][fext_action].setdefault(fext_name, 0)
+                master_report[token_name]["loc_changes_by_filetype"][fext_action][fext_name] += fext_count
+
 def join_reports(s3_report_paths: List[str], report_date_str: str, report_name: str):
     """
     Given a list of s3 report paths, combine them into a single json file
@@ -53,7 +76,6 @@ def join_reports(s3_report_paths: List[str], report_date_str: str, report_name: 
     assembly_dir = "/tmp/reports_to_join/"
 
     for report_location in s3_report_paths:
-
         # download and extract report
         report_path_pieces = report_location.split("/")
         bucket = report_path_pieces[2]
@@ -64,110 +86,9 @@ def join_reports(s3_report_paths: List[str], report_date_str: str, report_name: 
         with open(local_report_path, "r") as f:
             worker_report = json.load(f)
             for token_name, token_data in worker_report.items():
-                if token_name in master_report:
-                    master_report[token_name]["commit_count"] += token_data[
-                        "commit_count"
-                    ]
-                    master_report[token_name]["lines_of_code"] += token_data[
-                        "lines_of_code"
-                    ]
-                    master_report[token_name]["commit_messages"] += token_data[
-                        "commit_messages"
-                    ]
+                _update_master_report(master_report, token_name, token_data)
 
-                    master_report[token_name]["distinct_authors"] += token_data[
-                        "distinct_authors"
-                    ]
-
-                    master_report[token_name]["commit_urls"] += token_data[
-                        "commit_urls"
-                    ]
-
-                    master_report[token_name]["changed_methods"] += token_data[
-                        "changed_methods"
-                    ]
-
-                    master_report[token_name]["active_repos"] += token_data[
-                        "active_repos"
-                    ]
-
-                    for fext_name, fext_count in token_data["file_extensions"].items():
-                        if fext_name in master_report[token_name]["file_extensions"]:
-                            master_report[token_name]["file_extensions"][
-                                fext_name
-                            ] += fext_count
-                        else:
-                            master_report[token_name]["file_extensions"][
-                                fext_name
-                            ] = fext_count
-
-                    for fext_action, fext_data in token_data[
-                        "loc_changes_by_filetype"
-                    ].items():
-                        for fext_name, fext_count in fext_data.items():
-                            if (
-                                fext_action
-                                not in master_report[token_name][
-                                    "loc_changes_by_filetype"
-                                ]
-                            ):
-                                master_report[token_name]["loc_changes_by_filetype"][
-                                    fext_action
-                                ] = token_data["loc_changes_by_filetype"][fext_action]
-                            else:
-                                if (
-                                    fext_name
-                                    in master_report[token_name][
-                                        "loc_changes_by_filetype"
-                                    ][fext_action]
-                                ):
-                                    master_report[token_name][
-                                        "loc_changes_by_filetype"
-                                    ][fext_action][fext_name] += fext_count
-                                else:
-                                    master_report[token_name][
-                                        "loc_changes_by_filetype"
-                                    ][fext_action][fext_name] = fext_count
-                else:
-                    master_report[token_name] = {}
-                    master_report[token_name]["commit_count"] = token_data[
-                        "commit_count"
-                    ]
-                    master_report[token_name]["lines_of_code"] = token_data[
-                        "lines_of_code"
-                    ]
-                    master_report[token_name]["commit_messages"] = token_data[
-                        "commit_messages"
-                    ]
-
-                    master_report[token_name]["distinct_authors"] = token_data[
-                        "distinct_authors"
-                    ]
-
-                    master_report[token_name]["commit_urls"] = token_data["commit_urls"]
-
-                    master_report[token_name]["changed_methods"] = token_data[
-                        "changed_methods"
-                    ]
-
-                    master_report[token_name]["file_extensions"] = token_data[
-                        "file_extensions"
-                    ]
-
-                    master_report[token_name]["loc_changes_by_filetype"] = token_data[
-                        "loc_changes_by_filetype"
-                    ]
-
-                    master_report[token_name]["active_repos"] = token_data[
-                        "active_repos"
-                    ]
-
-                    # these don't need to be appended, just assigned
-                    master_report[token_name]["description"] = token_data["description"]
-                    master_report[token_name]["project_created_cmc"] = token_data[
-                        "project_created_cmc"
-                    ]
-
+    # upload master report
     master_report_local_path = f"/tmp/{report_name}.json"
     with open(master_report_local_path, "w") as fp:
         json.dump(master_report, fp, indent=2)
@@ -339,6 +260,27 @@ def dump_empty_report(report_date: datetime):
     object_name = f"reports/{report_date_str}/{report_date_str}.json"
     s3_client.Bucket("coincommit").upload_file(master_report_local_path, object_name)
 
+def _get_date_range(days: int):
+        # make weekly raw report
+        end_date: datetime = datetime.strptime(
+            datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d"
+        )
+        start_date = end_date - timedelta(7)
+        start_date: datetime = datetime.strptime(
+            start_date.strftime("%Y-%m-%d"), "%Y-%m-%d"
+        )
+        yield range((end_date - start_date).days + 1)
+
+def _generate_windowed_report(range_days, report_name):
+        today = datetime.strptime(datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d")
+        report_range = _get_date_range(days=range_days)
+        s3_report_paths = [
+            f"s3://coincommit/reports/{report_date_str}/{report_date_str}.json"
+            for report_date_str in report_range
+        ]
+        join_reports(
+            s3_report_paths, report_date_str=today, report_name=report_name
+        )
 
 def master_lambda_handler(event, context):
     secrets: Dict[str, str] = get_secrets()
@@ -448,42 +390,15 @@ def master_lambda_handler(event, context):
 
     print(f"{len(results)} workers, valid results {len(valid_results)}")
 
-    def _get_date_range(days: int):
-        # make weekly raw report
-        end_date: datetime = datetime.strptime(
-            datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d"
-        )
-        start_date = end_date - timedelta(7)
-        start_date: datetime = datetime.strptime(
-            start_date.strftime("%Y-%m-%d"), "%Y-%m-%d"
-        )
-        yield range((end_date - start_date).days + 1)
-
     if len(valid_results) > 0:
         # join worker reports
         join_worker_reports(valid_results, report_date=end_date)
 
-        today: str = datetime.strptime(datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d")
-
         # make weekly raw report
-        weekly_range = _get_date_range(days=7)
-        weekly_s3_report_paths = [
-            f"s3://coincommit/reports/{report_date_str}/{report_date_str}.json"
-            for report_date_str in weekly_range
-        ]
-        join_reports(
-            weekly_s3_report_paths, report_date_str=today, report_name="raw_weekly"
-        )
+        _generate_windowed_report(7, "raw_weekly")
 
         # make monthly raw report
-        weekly_range = _get_date_range(days=30)
-        weekly_s3_report_paths = [
-            f"s3://coincommit/reports/{report_date_str}/{report_date_str}.json"
-            for report_date_str in weekly_range
-        ]
-        join_reports(
-            weekly_s3_report_paths, report_date_str=today, report_name="raw_monthly"
-        )
+        _generate_windowed_report(30, "raw_monthly")
 
     else:
         dump_empty_report(report_date=end_date)
