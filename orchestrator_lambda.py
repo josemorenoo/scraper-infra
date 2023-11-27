@@ -410,10 +410,10 @@ def master_lambda_handler(event, context):
         join_worker_reports(valid_results, report_date=end_date)
 
         # make weekly raw report
-        _generate_windowed_report(7, "raw_weekly")
+        _generate_windowed_report(7, "weekly_raw")
 
         # make monthly raw report
-        _generate_windowed_report(30, "raw_monthly")
+        _generate_windowed_report(30, "monthly_raw")
 
     else:
         dump_empty_report(report_date=end_date)
