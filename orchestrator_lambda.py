@@ -72,15 +72,22 @@ def join_reports(s3_report_paths: List[str], report_date_str: str, report_name: 
     """
     Given a list of S3 report paths, combine them into a single JSON file.  If a report does not exist in S3, skip it
     """
+    print(f"Joining the following reports into {report_name}:")
+    print(*s3_report_paths, sep="\n")
+
     master_report = {}
     assembly_dir = "/tmp/reports_to_join/"
+    if not os.path.exists(assembly_dir):
+        os.makedirs(assembly_dir, exist_ok=True)
+
     s3_client = boto3.client('s3')
 
     for report_location in s3_report_paths:
         report_path_pieces = report_location.split("/")
         bucket = report_path_pieces[2]
         report_path = "/".join(report_path_pieces[3:])
-        local_report_path = assembly_dir + report_path_pieces[-1]
+        local_report_path = os.path.join(assembly_dir, report_path_pieces[-1])
+
 
         # Check if report exists in S3
         try:
@@ -104,7 +111,7 @@ def join_reports(s3_report_paths: List[str], report_date_str: str, report_name: 
         print(f"Dumped report to {master_report_local_path}")
 
     object_name = f"reports/{report_date_str}/{report_name}.json"
-    s3_client.upload_file(master_report_local_path, object_name)
+    s3_client.upload_file(master_report_local_path, "coincommit", object_name)
     print(f"Uploaded {master_report_local_path} to {object_name}")
 
 
@@ -270,25 +277,24 @@ def dump_empty_report(report_date: datetime):
     s3_client.Bucket("coincommit").upload_file(master_report_local_path, object_name)
 
 def _get_date_range(days: int):
-    # make weekly raw report
-    end_date: datetime = datetime.strptime(
-        datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d"
-    )
-    start_date = end_date - timedelta(days)
-    start_date: datetime = datetime.strptime(
-        start_date.strftime("%Y-%m-%d"), "%Y-%m-%d"
-    )
-    yield range((end_date - start_date).days + 1)
+    """
+    Generator function to yield dates for the given range.
+    """
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=days)
+    
+    for n in range((end_date - start_date).days + 1):
+        yield (start_date + timedelta(n)).strftime("%Y-%m-%d")
 
 def _generate_windowed_report(range_days, report_name):
-    today = datetime.strptime(datetime.now().strftime("%Y-%m-%d"), "%Y-%m-%d")
+    today_str = datetime.now().date().strftime("%Y-%m-%d")
     report_range = _get_date_range(days=range_days)
     s3_report_paths = [
         f"s3://coincommit/reports/{report_date_str}/{report_date_str}.json"
         for report_date_str in report_range
     ]
     join_reports(
-        s3_report_paths, report_date_str=today, report_name=report_name
+        s3_report_paths, report_date_str=today_str, report_name=report_name
     )
 
 def master_lambda_handler(event, context):
