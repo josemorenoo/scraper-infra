@@ -66,6 +66,8 @@ if __name__ == "__main__":
 
     print(f"downloading s3://{bucket}/{s3_object} to {daily_report_local_path}")
     s3_client.download_file(bucket, s3_object, daily_report_local_path)
+    s3_client.download_file(bucket, f"reports/{report_date_str}/weekly_raw.json", weekly_report_local_path)
+    s3_client.download_file(bucket, f"reports/{report_date_str}/monthly_raw.json", monthly_report_local_path)
 
     print(os.listdir("/tmp"))
 
